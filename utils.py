@@ -6,6 +6,8 @@ Created on Mon Mar 11 09:56:38 2019
 """
 import pandas as pd
 from queue import PriorityQueue
+import collections
+
 #==============================================================================
 # 道路类
 # =============================================================================
@@ -22,7 +24,8 @@ class Road:
         '''
         用于优先队列中排序比较
         '''
-        return self.length<other.length
+        return self.length <= other.length
+
 
          
 # =============================================================================
@@ -49,54 +52,72 @@ class Cross:
 #        self.road_down=road_down
 #        self.road_left=road_left
 
+# ====================================================================
 class Graph:
-             
-    def __init__(self,roads,crosses):
-        self.adj=dict()     #邻接矩阵 存放的是一个道路类集合
-        self.cross_num=crosses.shape[0]
-        
-        for i in range(self.cross_num):
-           self.adj[crosses['id'][i]]=set()
-        
+    '''
+    地图类
+    成员变量：
+        adj：存放于道路起点相连的所有道路，数据类型：dict(),key:起点路口编号,value：set([与起点相连的道路类集合])
+    成员函数：
+        dijkstra(self,origin,destination)：搜索最短路径
+    '''        
+    def __init__(self,roads):
+        '''
+        构造方法
+        参数：
+            roads:道路数据，数据类型：pandas.DataFrame
+        '''
+        self.adj=collections.defaultdict(set)
         for _,road in roads.iterrows():
             if road['isDuplex']==1:
                 self.adj[road['to']].add(Road(road['length'],road['to'],road['from']))
             self.adj[road['from']].add(Road(road['length'],road['from'],road['to']))
-        
 
+
+    def dijkstra(self,origin,destination):
+        '''
+        搜索最短路径
+        参数：
+            origin:起点路口编号
+            destination:目的地路口编号
+        输出：
+            path：最短路径，数据类型：dict()
+        '''
+        edge_to=dict()      #最短路径 key:to value:from
+        edge_to[origin]=origin
+
+        routes=PriorityQueue(100)       #优先队列最大容量，默认设置：100
+        for road in self.adj[origin]:
+            routes.put(road)
+        
+        visited=set()
+        visited.add(origin)
+
+        while routes:
+            
+            road=routes.get()       #最短的一段路径
+            if road.road_to in visited:     #如果已经访问，则进入下一轮
+                continue
+            
+            edge_to[road.road_to]=road.road_from
+            if road.road_to == destination:     #达到终点
+                path=dict()
+                path_to=destination
+                while path_to != origin:
+                    path[path_to]=edge_to[path_to]
+                    path_to=edge_to[path_to]
+                return path
+            
+            for neighbor in self.adj[road.road_to]:     #将新加入节点的邻接元素加入优先队列
+                if neighbor not in visited:
+                    routes.put(neighbor)
+            visited.add(road.road_to)
+
+        print('访问路径不存在！')
+        return dict()       #返回空
 #==============================================================================        
 
-class Shortest_path:
-    '''
-    最短路径
-    '''
-    def __init__(self, g, car_from, car_to):
-
-        self.edge_to=dict()     #最短路径 key:to value:from
-        self.dist_to=dict()
-        self.pq=PriorityQueue()     #存放道路
-
-        self.edge_to[car_from]=car_from
-        self.add_roads(g.adj[car_from])
-
-        while car_to not in self.edge_to.keys():
-            road=self.pq.get()
-            self.edge_to[road.road_to]=road.road_from
-            self.add_roads(g.adj[road.road_from])
-
-
-    def add_roads(self,s):
-        '''
-        将邻接表中的路径添加到优先队列中
-        '''
-        for road in s:      #s 道路集合
-            if road.road_to not in self.edge_to.keys():
-                self.pq.put(road)
-
-
-
-
-   
+  
 
 #==============================================================================
 
@@ -132,35 +153,7 @@ if __name__=='__main__':
     file_path='F:/2019HWcode/code/SDK_python/CodeCraft-2019/config'
     obj1='road'
     roads=load_data(file_path,obj1)
-    
-    obj2='cross'
-    crosses=load_data(file_path,obj2)
 
-    graph=Graph(roads,crosses)
-
-    sp=Shortest_path(graph,1,5)
-    print(sp.edge_to)
-
-
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    graph=Graph(roads)
+    path=graph.dijkstra(1,2)
+    print(path)
